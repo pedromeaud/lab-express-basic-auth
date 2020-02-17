@@ -9,8 +9,12 @@ const sassMiddleware = require('node-sass-middleware');
 const serveFavicon = require('serve-favicon');
 
 const indexRouter = require('./routes/index');
-
+const expressSession = require('express-session');
+const ConnectMongo = require('connect-mongo');
+const mongoStore = ConnectMongo(expressSession);
+const mongoose = require('mongoose');
 const app = express();
+const authRouter = require('./routes/authentication');
 
 // Setup view engine
 app.set('views', join(__dirname, 'views'));
@@ -31,6 +35,29 @@ app.use(
     sourceMap: true
   })
 );
+
+app.use('/authentication', authRouter);
+
+app.use(
+  expressSession({
+    secret: process.env.SESSION_SECRET,
+    resave: true,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 15 * 24 * 60 * 60 * 1000
+    },
+    store: new mongoStore({
+      mongooseConnection: mongoose.connection,
+      ttl: 60 * 60
+    })
+  })
+);
+
+const deserializeUser = require('./middleware/deserialize-user');
+const passUserToViews = require('./middleware/pass-user-to-views');
+
+app.use(deserializeUser);
+app.use(passUserToViews);
 
 app.use('/', indexRouter);
 
